@@ -2,10 +2,12 @@ package com.builderstoolkit.client.gui;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import net.minecraft.client.gui.GuiTextField;
 
 import com.builderstoolkit.client.CommandQueue;
+import com.builderstoolkit.client.blend.BlendSettings;
 import com.builderstoolkit.client.blend.ShapeGradient;
 import com.builderstoolkit.client.generate.Rotate3D;
 import com.builderstoolkit.client.generate.ShapePreset;
@@ -34,7 +36,6 @@ public class GenerateScreen extends ToolkitScreen {
     private static boolean spin = true;
     private static double rotX = 0, rotY = 0, rotZ = 0;
     private static ShapeGradient.Axis gradientAxis = ShapeGradient.Axis.Y;
-    private static double gradientDither = 0.35;
 
     private final ShapePreview preview = new ShapePreview();
     private boolean dirty = true;
@@ -116,22 +117,10 @@ public class GenerateScreen extends ToolkitScreen {
             dirty = true;
         }));
 
-        buttonList.add(new CycleButton(left + 8, top + 202, 86, 16, "Axis", () -> gradientAxis.name(), () -> {
+        buttonList.add(new CycleButton(left + 8, top + 202, 110, 16, "Axis", () -> gradientAxis.name(), () -> {
             ShapeGradient.Axis[] axes = ShapeGradient.Axis.values();
             gradientAxis = axes[(gradientAxis.ordinal() + 1) % axes.length];
         }));
-        buttonList.add(
-            new SliderButton(
-                left + 98,
-                top + 202,
-                110,
-                16,
-                "dither",
-                0,
-                100,
-                true,
-                gradientDither * 100,
-                v -> gradientDither = v / 100.0));
         buttonList.add(new FlatButton(left + 212, top + 202, 110, 16, "Use as pattern", this::useGradient));
 
         exprBox = new GuiTextField(this.fontRendererObj, left + 8, top + 224, panelW - 16, 16);
@@ -202,8 +191,22 @@ public class GenerateScreen extends ToolkitScreen {
     private List<String> gradientScript() {
         List<String> ids = GradientScreen.gradientBlockIds();
         if (ids.isEmpty()) return new ArrayList<String>();
-        return ShapeGradient
-            .build(displayExpr(), Rotate3D.preamble(rotX, rotY, rotZ), ids, gradientAxis, gradientDither, hollow);
+        return ShapeGradient.build(
+            displayExpr(),
+            Rotate3D.preamble(rotX, rotY, rotZ),
+            ids,
+            gradientAxis,
+            GradientScreen.blendSettings(),
+            preview.axisExtent(gradientAxis.index),
+            hollow);
+    }
+
+    /** Reminds you that the noise comes from the Gradient tab, not from here. */
+    private static String blendSummary() {
+        BlendSettings b = GradientScreen.blendSettings();
+        return b.flat() ? "bands"
+            : b.mode.name()
+                .toLowerCase(Locale.ROOT) + " " + Math.round(b.randomness * 100) + "%";
     }
 
     /** Longest gradient pass against the chat cap, which is what silently breaks builds. */
@@ -330,6 +333,7 @@ public class GenerateScreen extends ToolkitScreen {
         text(preset().name, left + 28, top + 31, Theme.TEXT_ACCENT);
         text("pattern", left + 8, top + 107, Theme.TEXT_DIM);
         textClipped(gradientStatus(), left + 8, top + 192, panelW - 16, gradientStatusColor());
+        textClipped(blendSummary(), left + 124, top + 206, 84, Theme.TEXT_DIM);
         text(isCustom() ? "expression (editable)" : "expression", left + 8, top + 214, Theme.TEXT_DIM);
         textClipped(currentCommand(), left + 8, top + 268, panelW - 16, Theme.TEXT_OK);
 

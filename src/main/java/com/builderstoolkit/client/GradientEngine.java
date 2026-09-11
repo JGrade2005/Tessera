@@ -2,6 +2,7 @@ package com.builderstoolkit.client;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -47,7 +48,7 @@ public final class GradientEngine {
      *
      * @param waypoints ordered endpoint/midpoint variants (at least one)
      * @param length    total blocks in the output strip
-     * @param allowDup  if false, avoids repeating the previous slot
+     * @param allowDup  if false, every slot gets a block no other slot uses
      * @param avoid     blocks to steer away from, so a reshuffle lands elsewhere
      */
     public static List<Entry> generate(List<Entry> waypoints, int length, boolean allowDup, Set<Entry> avoid) {
@@ -88,13 +89,20 @@ public final class GradientEngine {
             }
         }
 
-        Entry prev = null;
+        // With duplicates off, every block already placed is off the table - not just
+        // the one before this slot. Excluding only the previous pick still lets a
+        // strip alternate between two blocks, which is not what "no duplicates" means.
+        Set<Entry> used = allowDup ? null : new HashSet<Entry>();
+        // Waypoints are reserved from the start. Without this, a waypoint can win an
+        // earlier slot on merit and then be forced into its own slot as well, which
+        // is one duplicate that "no duplicates" would not have caught.
+        if (used != null) used.addAll(wp);
         for (int i = 0; i < length; i++) {
             Entry chosen = forcedWaypoint(i, wpIndex, wp);
-            if (chosen == null) chosen = bestFit(target[i], allowDup ? null : prev, avoid);
+            if (chosen == null) chosen = bestFit(target[i], used, avoid);
             if (chosen == null) break; // empty palette
             out.add(chosen);
-            prev = chosen;
+            if (used != null) used.add(chosen);
         }
         return out;
     }
@@ -106,11 +114,15 @@ public final class GradientEngine {
         return null;
     }
 
-    /** Lowest-scoring palette entry for a LAB target, respecting the filter. */
-    private static Entry bestFit(float[] targetLab, Entry exclude, Set<Entry> avoid) {
+    /**
+     * Lowest-scoring palette entry for a LAB target, respecting the filter.
+     *
+     * @param exclude blocks already spoken for, or null to allow repeats
+     */
+    private static Entry bestFit(float[] targetLab, Set<Entry> exclude, Set<Entry> avoid) {
         Entry best = null;
         double bestScore = Double.MAX_VALUE;
-        Entry fallback = null; // first filter-passing entry, in case exclude removed the only match
+        Entry fallback = null; // first filter-passing entry, in case exclude left nothing
 
         List<Entry> palette = BlockColorIndex.palette();
         synchronized (palette) {
@@ -118,7 +130,7 @@ public final class GradientEngine {
                 Entry e = palette.get(i);
                 if (!PaletteFilter.accepts(e)) continue;
                 if (fallback == null) fallback = e;
-                if (e == exclude) continue;
+                if (exclude != null && exclude.contains(e)) continue;
 
                 double score = Lab.deltaE(targetLab, e.lab) + UNIFORMITY * e.deviation;
                 if (avoid.contains(e)) score += AVOID_PENALTY;

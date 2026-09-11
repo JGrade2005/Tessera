@@ -155,6 +155,42 @@ cancel. **Copy grad** still copies the script for use with a macro mod.
 
 Each pass fills one band, so together they fill the shape exactly once.
 
+#### Duplicates
+
+With **Dupes on**, a long strip often collapses onto a few blocks: neighbouring
+steps are only a few deltaE apart, and one flat block can be the best fit for
+several of them at once. Turning Dupes **off** reserves every block the strip has
+already used, plus all the waypoints, so each slot gets one of its own. The Result
+header says how many distinct blocks the strip actually holds.
+
+#### Blend settings and the shape gradient
+
+The Blend controls on the Gradient tab drive **both** the wall preview and the
+Generate tab's shape gradient, so what the preview shows is what a `//g` build
+gets. `wall H` is the exception — it is the wall's layer count, which a 3D shape
+has no equivalent for.
+
+The match is in character, not cell for cell. WorldEdit's expression language has
+no noise function and no per-block randomness, so the noise is a sum of sines:
+`scale` sets their frequency, `octaves` adds finer terms on top, `Reroll seed`
+picks a different frequency mix, and `randomness` scales how far a block can move
+from its band — the same ±3 steps at 100% that the preview uses. `DITHER` is the
+same noise at a much higher frequency, which is the nearest an expression gets to
+per-cell scatter. `MAP` drops the gradient axis entirely and slices on the noise
+alone.
+
+Only the first two octaves are emitted. A third costs about twenty characters in
+every pass, and the limit below is what that spends.
+
+#### Bands follow the shape, not the selection
+
+`//g` normalises coordinates to the **selection**, but a shape rarely fills it: a
+sphere of radius 0.8 only reaches `y = +-0.8`. Bands spread over the full `-1..1`
+would leave the first and last gradient blocks with nowhere to go, so a strip of 11
+would build out of 9. The Generate tab measures how far the shape actually reaches
+along the gradient axis - the 3D preview already samples exactly that - and lays the
+bands across that range instead. Every block of the gradient gets used.
+
 #### The chat character limit
 
 Minecraft truncates a chat message at **100 characters** — silently, so an
@@ -165,14 +201,24 @@ allows. Passes longer than the limit are refused rather than sent half-written,
 and the Generate tab shows the longest pass against the limit as you work.
 
 Every emitted character is therefore rationed: rotation drops identity rows, zero
-terms and unit coefficients, numbers lose their leading zero, and the shape is
-inlined instead of being assigned to a variable first. A torus at full three-axis
-rotation went from 308 characters a pass to 198 that way. Four of the 38 presets
-still overflow 256 when all three rotation sliders are used at once; single-axis
-rotation fits for every preset.
+terms and unit coefficients, numbers lose their leading zero, the noise seed rides
+in the frequencies rather than in phase terms, and the shape is inlined instead of
+being assigned to a variable first. A torus at full three-axis rotation went from
+308 characters a pass to 198 that way.
+
+What fits, across all 38 presets and all four blend modes:
+
+| | unrotated | one axis | all three |
+|---|---|---|---|
+| 1 octave | all fit | all fit | ~13% overflow |
+| 2 octaves | all fit | ~2% overflow | ~30% overflow |
+
+The overflows are the same handful of long presets — Spiral Stair, Mega Fancy
+Cube, Boulder, Lollipop Tree. Rotating on one axis rather than three is what buys
+the most room.
 
 - **Axis** - `Y`, `X`, `Z`, or `RADIAL`, which fades outward from the centre and
-  suits spheres and tori.
+  suits spheres and tori. Ignored in `MAP` mode, which slices on noise instead.
 - **dither** - lets band edges wander so the transitions interlock instead of
   showing hard rings. The expression language has no noise function, so this is a
   sum of three incommensurate sines.

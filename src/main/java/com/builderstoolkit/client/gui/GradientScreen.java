@@ -14,6 +14,7 @@ import com.builderstoolkit.client.BlockColorIndex.Entry;
 import com.builderstoolkit.client.GradientEngine;
 import com.builderstoolkit.client.PaletteFilter;
 import com.builderstoolkit.client.blend.BlendEngine;
+import com.builderstoolkit.client.blend.BlendSettings;
 import com.builderstoolkit.client.blend.WorldEditScript;
 import com.builderstoolkit.client.gui.widget.CycleButton;
 import com.builderstoolkit.client.gui.widget.FlatButton;
@@ -184,6 +185,11 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
         return ids;
     }
 
+    /** The Blend controls, for the Generate tab's shape gradient to build with. */
+    public static BlendSettings blendSettings() {
+        return new BlendSettings(blendMode, randomness, noiseScale, octaves, seed);
+    }
+
     /**
      * The current gradient as a WorldEdit weighted pattern, mixed using the
      * Blend settings so the mode and randomness carry across. Null when no
@@ -273,7 +279,7 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
         drawSection("Strip", left + SEC_X, top + STRIP_Y, secW(), 36);
         text("Len " + length, left + 60, top + STRIP_Y + 20, Theme.TEXT);
 
-        drawSection("Result", left + SEC_X, top + RESULT_Y, secW(), RESULT_H);
+        drawSection(resultLabel(), left + SEC_X, top + RESULT_Y, secW(), RESULT_H);
         hoveredEntry = drawResult(mouseX, mouseY);
 
         drawSection("Blend  (2D wall preview)", left + SEC_X, top + BLEND_Y, secW(), 190);
@@ -332,6 +338,18 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
             }
         }
         endBlockFaces();
+    }
+
+    /**
+     * Says how many distinct blocks the strip holds. With Dupes on, neighbouring
+     * steps often resolve to the same block, so a strip of 11 can build out of 5 -
+     * which is invisible from the icons alone when the repeats are near-identical.
+     */
+    private String resultLabel() {
+        if (result.isEmpty()) return "Result";
+        int distinct = new HashSet<Entry>(result).size();
+        if (distinct == result.size()) return "Result  (" + distinct + " blocks)";
+        return "Result  (" + distinct + " distinct of " + result.size() + " - turn Dupes off)";
     }
 
     /** Draws the result strip and returns the entry under the cursor, if any. */

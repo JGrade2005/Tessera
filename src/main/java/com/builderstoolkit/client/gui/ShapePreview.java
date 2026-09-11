@@ -20,6 +20,9 @@ public final class ShapePreview {
 
     /** {gx, gy, gz, rgb} per surface voxel. */
     private final List<int[]> surface = new ArrayList<int[]>();
+    /** How far the shape actually reaches along x, y, z and radius: {min, max} each. */
+    private final double[] extent = new double[8];
+    private boolean measured;
     private int res;
     private String error;
 
@@ -39,8 +42,27 @@ public final class ShapePreview {
     }
 
     /** Re-evaluate the expression. O(resolution^3) evaluations. */
+    /**
+     * How far the shape reaches along one axis, as {min, max} in -1..1, or null if
+     * nothing has been sampled. The gradient bands are laid across this rather than
+     * across the whole selection, so a shape that does not fill its selection still
+     * uses every block of the gradient.
+     *
+     * @param axis 0 = x, 1 = y, 2 = z, 3 = distance from the centre
+     */
+    public double[] axisExtent(int axis) {
+        if (!measured || axis < 0 || axis > 3) return null;
+        double lo = extent[axis * 2], hi = extent[axis * 2 + 1];
+        return hi > lo ? new double[] { lo, hi } : null;
+    }
+
     public void sample(String expr, String pattern, int resolution) {
         surface.clear();
+        measured = false;
+        for (int i = 0; i < 4; i++) {
+            extent[i * 2] = Double.MAX_VALUE;
+            extent[i * 2 + 1] = -Double.MAX_VALUE;
+        }
         error = null;
         res = Math.max(8, resolution);
 
@@ -70,6 +92,11 @@ public final class ShapePreview {
                         continue;
                     }
                     if (!r.placed) continue;
+                    track(0, x);
+                    track(1, y);
+                    track(2, z);
+                    track(3, Math.sqrt(x * x + y * y + z * z));
+                    measured = true;
                     int idx = (gx * n + gy) * n + gz;
                     occupied[idx] = true;
                     color[idx] = r.hasData ? WOOL[((int) Math.floor(r.data)) & 15] : base;
@@ -99,6 +126,11 @@ public final class ShapePreview {
                 }
             }
         }
+    }
+
+    private void track(int axis, double v) {
+        if (v < extent[axis * 2]) extent[axis * 2] = v;
+        if (v > extent[axis * 2 + 1]) extent[axis * 2 + 1] = v;
     }
 
     public void draw(ToolkitScreen screen, int bx, int by, int bw, int bh, boolean spin) {
