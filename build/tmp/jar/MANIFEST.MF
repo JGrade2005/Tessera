@@ -1,8 +1,0 @@
-Manifest-Version: 1.0
-Specification-Title: gradientcraft
-Specification-Vendor: gradientcraft
-Specification-Version: 1
-Implementation-Title: gradientcraft
-Implementation-Version: 1.0.0
-Implementation-Vendor: gradientcraft
-
