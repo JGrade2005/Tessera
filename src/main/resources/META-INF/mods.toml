@@ -1,0 +1,55 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="MIT"
+
+[[mods]]
+modId="gradientcraft"
+version="1.0.0"
+displayName="GradientCraft"
+description='''
+A client-side build helper. Open it from a button on your inventory, drop in
+blocks from your inventory or JEI, and it generates a smooth color gradient
+using any blocks in the game. If WorldEdit is also installed, it adds
+/verticalsmooth, a version of //smooth that smooths vertical faces (cliffs,
+towers, walls) instead of flattening them to a horizontal plane.
+'''
+
+# Client-only utility: tell Forge not to complain when this mod is on the
+# client but not the server (and vice versa), so it works on any server.
+# Note: /verticalsmooth itself only functions where BOTH GradientCraft and
+# WorldEdit are loaded on the side that owns the command dispatcher (the
+# integrated server for singleplayer; the dedicated server for multiplayer).
+displayTest="IGNORE_ALL_VERSION"
+
+[[dependencies.gradientcraft]]
+    modId="forge"
+    mandatory=true
+    versionRange="[40,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.gradientcraft]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.18.2,1.19)"
+    ordering="NONE"
+    side="BOTH"
+
+# JEI is optional; the mod runs fine without it.
+[[dependencies.gradientcraft]]
+    modId="jei"
+    mandatory=false
+    versionRange="[9.0,)"
+    ordering="AFTER"
+    side="CLIENT"
+
+# WorldEdit is optional; without it, everything except /verticalsmooth still
+# works normally. side=BOTH because /verticalsmooth needs WorldEdit wherever
+# the command actually runs (the server side, including the integrated
+# singleplayer server).
+[[dependencies.gradientcraft]]
+    modId="worldedit"
+    mandatory=false
+    versionRange="[7.2.0,)"
+    ordering="AFTER"
+    side="BOTH"

@@ -1,0 +1,88 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '[5.1,6.0)', changing: true
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'eclipse'
+
+version = '1.0.0'
+group = 'com.gradientcraft'
+archivesBaseName = 'gradientcraft-1.18.2'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    // Official Mojang mappings for 1.18.2.
+    mappings channel: 'official', version: '1.18.2'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods {
+                gradientcraft {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    // JEI lives on BlameJared's maven.
+    maven {
+        name = 'BlameJared'
+        url = 'https://maven.blamejared.com/'
+    }
+    // WorldEdit lives on EngineHub's maven.
+    maven {
+        name = 'EngineHub'
+        url = 'https://maven.enginehub.org/repo/'
+    }
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.18.2-40.2.21'
+
+    // JEI is compile-time + dev-runtime only. It is optional at runtime.
+    // Adjust the version string if you target a different JEI build for 1.18.2.
+    compileOnly fg.deobf('mezz.jei:jei-1.18.2:9.7.2.281:api')
+    runtimeOnly fg.deobf('mezz.jei:jei-1.18.2:9.7.2.281')
+
+    // WorldEdit is compile-time + dev-runtime only. It is optional at runtime -
+    // /verticalsmooth simply won't register if WorldEdit isn't installed.
+    // Pinned to 7.2.10, matching "WorldEdit 7.2.10 (Forge/Fabric for MC 1.18.2)"
+    // on CurseForge (file 3697298) - the version confirmed for this project.
+    //
+    // Two separate artifacts are needed:
+    //  - worldedit-core has the platform-independent API (EditSession,
+    //    LocalSession, WorldEdit, Region, BlockVector3, ...). It is plain Java
+    //    with no Minecraft-mapped symbols, so it must NOT go through
+    //    fg.deobf() - add it as a normal dependency.
+    //  - worldedit-forge-mc1.18.2 has only the Forge-specific glue (ForgeAdapter
+    //    and friends), which DOES reference Minecraft classes, so it needs
+    //    fg.deobf() like any other Forge mod jar.
+    compileOnly 'com.sk89q.worldedit:worldedit-core:7.2.10'
+    runtimeOnly 'com.sk89q.worldedit:worldedit-core:7.2.10'
+    compileOnly fg.deobf('com.sk89q.worldedit:worldedit-forge-mc1.18.2:7.2.10')
+    runtimeOnly fg.deobf('com.sk89q.worldedit:worldedit-forge-mc1.18.2:7.2.10')
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : 'gradientcraft',
+                'Specification-Vendor'    : 'gradientcraft',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.version,
+                'Implementation-Vendor'   : 'gradientcraft'
+        ])
+    }
+}
