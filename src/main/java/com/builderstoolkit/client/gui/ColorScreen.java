@@ -44,7 +44,7 @@ public class ColorScreen extends ToolkitScreen {
     private final List<Entry> results = new ArrayList<Entry>();
 
     public ColorScreen() {
-        super("Colour Picker", Tab.COLORS, 300, 266);
+        super("Colour Picker", Tab.COLORS, 300, 288);
     }
 
     @Override

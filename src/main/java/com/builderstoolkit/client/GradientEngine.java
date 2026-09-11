@@ -1,17 +1,45 @@
 package com.builderstoolkit.client;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import com.builderstoolkit.client.BlockColorIndex.Entry;
 
 /**
  * Produces an ordered strip of block variants transitioning through the given
- * waypoints. In-between steps are the nearest palette entry in LAB space.
+ * waypoints. In-between steps are the best-fitting palette entry for an
+ * interpolated LAB target.
+ *
+ * Best fit is not the same as nearest colour. A block whose average matches but
+ * whose texture is a two-tone mess reads as noise in the wall, so a candidate is
+ * scored on its distance to the target plus a share of its own colour spread.
+ * That is what makes the strip look like a gradient rather than a list of
+ * technically-closest blocks.
  */
 public final class GradientEngine {
 
+    /**
+     * Weight on a block's internal colour spread, in deltaE per unit of RMS
+     * spread. At 0.30 a busy texture (spread ~40) has to be about 12 deltaE
+     * closer than a flat one to win, which is roughly "clearly a better match".
+     */
+    private static final double UNIFORMITY = 0.30;
+
+    /**
+     * Score added to blocks the caller asked to avoid. Large enough to hand the
+     * slot to a different block, small enough that the replacement is still in
+     * the right part of the palette.
+     */
+    private static final double AVOID_PENALTY = 15.0;
+
     private GradientEngine() {}
+
+    /** Convenience for the common case of no blocks to avoid. */
+    public static List<Entry> generate(List<Entry> waypoints, int length, boolean allowDup) {
+        return generate(waypoints, length, allowDup, Collections.<Entry>emptySet());
+    }
 
     /**
      * Runs in O(length * palette) time and O(length) space, which is fine for a
@@ -20,8 +48,9 @@ public final class GradientEngine {
      * @param waypoints ordered endpoint/midpoint variants (at least one)
      * @param length    total blocks in the output strip
      * @param allowDup  if false, avoids repeating the previous slot
+     * @param avoid     blocks to steer away from, so a reshuffle lands elsewhere
      */
-    public static List<Entry> generate(List<Entry> waypoints, int length, boolean allowDup) {
+    public static List<Entry> generate(List<Entry> waypoints, int length, boolean allowDup, Set<Entry> avoid) {
         List<Entry> out = new ArrayList<Entry>();
         if (waypoints == null || waypoints.isEmpty() || !BlockColorIndex.isReady()) return out;
 
@@ -62,7 +91,7 @@ public final class GradientEngine {
         Entry prev = null;
         for (int i = 0; i < length; i++) {
             Entry chosen = forcedWaypoint(i, wpIndex, wp);
-            if (chosen == null) chosen = nearest(target[i], allowDup ? null : prev);
+            if (chosen == null) chosen = bestFit(target[i], allowDup ? null : prev, avoid);
             if (chosen == null) break; // empty palette
             out.add(chosen);
             prev = chosen;
@@ -77,10 +106,10 @@ public final class GradientEngine {
         return null;
     }
 
-    /** Nearest palette entry to a LAB target, respecting the filter and optionally avoiding a repeat. */
-    private static Entry nearest(float[] targetLab, Entry exclude) {
+    /** Lowest-scoring palette entry for a LAB target, respecting the filter. */
+    private static Entry bestFit(float[] targetLab, Entry exclude, Set<Entry> avoid) {
         Entry best = null;
-        double bestDist = Double.MAX_VALUE;
+        double bestScore = Double.MAX_VALUE;
         Entry fallback = null; // first filter-passing entry, in case exclude removed the only match
 
         List<Entry> palette = BlockColorIndex.palette();
@@ -90,9 +119,11 @@ public final class GradientEngine {
                 if (!PaletteFilter.accepts(e)) continue;
                 if (fallback == null) fallback = e;
                 if (e == exclude) continue;
-                double d = Lab.deltaE(targetLab, e.lab);
-                if (d < bestDist) {
-                    bestDist = d;
+
+                double score = Lab.deltaE(targetLab, e.lab) + UNIFORMITY * e.deviation;
+                if (avoid.contains(e)) score += AVOID_PENALTY;
+                if (score < bestScore) {
+                    bestScore = score;
                     best = e;
                 }
             }

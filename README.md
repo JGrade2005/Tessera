@@ -56,6 +56,9 @@ chosen waypoints are always kept regardless.
 - **No-TE** — excludes blocks with tile entities (chests, furnaces, signs).
 - **Sides** — only blocks whose six faces all use the same texture, so no grass
   blocks with a green top and dirt sides.
+- **No-Ore** — excludes ore blocks, identified by the ore dictionary. **On by
+  default**: an ore is a base texture with high-contrast speckles, so it reads as
+  noise in a wall however close its average colour is.
 
 Colours are read from the **stitched texture atlas** where possible, falling back
 to the source PNG. The atlas has an entry for every rendered block, including mods
@@ -97,9 +100,11 @@ is the palette; Blend turns it into the wall you would actually build.
 - **wall H** - how many layers tall the wall is, which is also the number of commands.
 - **Reroll seed** - a new random arrangement at the same settings.
 
-The preview draws each cell in the block's averaged colour rather than its item
-icon: a 58-wide wall is thousands of cells, and item rendering that many times a
-frame is far too slow.
+The preview draws each cell using the block's real side texture, which is the face
+a wall actually shows. The full wall is sampled down to the preview grid, so what
+you see is the whole gradient at the size it reads from a distance. Textures come
+straight off the stitched atlas as one quad per cell — rendering each cell as an
+item instead would be thousands of model draws a frame.
 
 ### Exporting to WorldEdit
 
@@ -135,9 +140,13 @@ it. **Copy gradient script** emits one `//g` per gradient step, each filling a b
 of space intersected with the shape:
 
 ```
-//g 1 sh=(x^2+y^2+z^2 < 0.8^2);g=y;return sh&&g<-0.6667
-//g 4 sh=(x^2+y^2+z^2 < 0.8^2);g=y;return sh&&g>=-0.6667&&g<-0.3333
+//g 1 g=y;return (x^2+y^2+z^2<.8^2)&&(g<-.667)
+//g 4 g=y;return (x^2+y^2+z^2<.8^2)&&(g>=-.667)&&(g<-.333)
 ```
+
+`g` is assigned before any rotation runs, so a vertical fade stays vertical however
+the shape is spun — and a preset that moves `x` or `z` itself, as Spiral Stair does,
+cannot drag the gradient along with it.
 
 **Run gradient** sends them for you, one every four ticks. That is not a
 convenience: Minecraft chat takes a single line, so a multi-command script cannot
@@ -145,6 +154,22 @@ be pasted, and firing them all at once trips server spam limits. Click it again 
 cancel. **Copy grad** still copies the script for use with a macro mod.
 
 Each pass fills one band, so together they fill the shape exactly once.
+
+#### The chat character limit
+
+Minecraft truncates a chat message at **100 characters** — silently, so an
+over-long `//g` arrives as a valid-looking prefix and WorldEdit builds something
+wrong out of it. GTNH ships Hodgepodge, whose `longerSentMessages` raises that to
+**256**; `chatCharLimit` in this mod's config must match whatever your server
+allows. Passes longer than the limit are refused rather than sent half-written,
+and the Generate tab shows the longest pass against the limit as you work.
+
+Every emitted character is therefore rationed: rotation drops identity rows, zero
+terms and unit coefficients, numbers lose their leading zero, and the shape is
+inlined instead of being assigned to a variable first. A torus at full three-axis
+rotation went from 308 characters a pass to 198 that way. Four of the 38 presets
+still overflow 256 when all three rotation sliders are used at once; single-axis
+rotation fits for every preset.
 
 - **Axis** - `Y`, `X`, `Z`, or `RADIAL`, which fades outward from the centre and
   suits spheres and tori.

@@ -20,6 +20,13 @@ public final class ModConfig {
     public static final int DEFAULT_BUTTON_X = 0;
     public static final int DEFAULT_BUTTON_Y = -22;
 
+    /**
+     * Longest command the server will accept. Vanilla 1.7.10 silently truncates a
+     * chat message at 100 characters; GTNH ships Hodgepodge, whose
+     * longerSentMessages raises that to 256, which is the default here.
+     */
+    public static final int DEFAULT_CHAT_LIMIT = 256;
+
     private static Configuration config;
 
     private static Theme.Palette theme = Theme.Palette.SLATE;
@@ -29,6 +36,7 @@ public final class ModConfig {
     private static boolean worldEditTools = true;
     private static boolean generateTab = true;
     private static boolean labTab = true;
+    private static int chatLimit = DEFAULT_CHAT_LIMIT;
 
     private ModConfig() {}
 
@@ -71,6 +79,10 @@ public final class ModConfig {
     /** The Lab tab likewise only produces a WorldEdit expression. */
     public static boolean labTabEnabled() {
         return worldEditTools && labTab;
+    }
+
+    public static int chatLimit() {
+        return chatLimit;
     }
 
     public static void init(File file) {
@@ -125,6 +137,18 @@ public final class ModConfig {
 
         labTab = config.get(CAT_WORLDEDIT, "labTab", true, "Show the Lab tab (parametric shape sandbox).")
             .getBoolean(true);
+
+        chatLimit = config
+            .get(
+                CAT_WORLDEDIT,
+                "chatCharLimit",
+                DEFAULT_CHAT_LIMIT,
+                "Longest command this mod will send, in characters.\n"
+                    + "Minecraft cuts a chat message off at 100; GTNH's Hodgepodge raises it to 256.\n"
+                    + "Gradient passes longer than this are refused rather than sent half-written.",
+                20,
+                32767)
+            .getInt(DEFAULT_CHAT_LIMIT);
 
         Theme.apply(theme);
 

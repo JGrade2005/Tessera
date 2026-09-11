@@ -9,8 +9,10 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderItem;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.IIcon;
 
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -87,6 +89,8 @@ public abstract class ToolkitScreen extends GuiContainer {
     private static final int SCROLL_STEP = 18;
     /** Clearance above the tab strip, so it sits below NEI's Item Subsets bar. */
     private static final int TOP_INSET = 36;
+    /** Clearance below the panel, so it never sits under NEI's search field. */
+    private static final int BOTTOM_INSET = 28;
     private static final int BAR_W = 4;
 
     protected final String title;
@@ -179,7 +183,7 @@ public abstract class ToolkitScreen extends GuiContainer {
 
     private int scrollMin() {
         int base = (this.height - panelH) / 2;
-        int lowestTop = Math.min(TAB_H + TOP_INSET, this.height - panelH - 8);
+        int lowestTop = Math.min(TAB_H + TOP_INSET, this.height - panelH - BOTTOM_INSET);
         return Math.min(lowestTop - base, scrollMax());
     }
 
@@ -210,7 +214,7 @@ public abstract class ToolkitScreen extends GuiContainer {
 
         int x = left + panelW + 2;
         int trackTop = TAB_H + TOP_INSET;
-        int trackH = this.height - trackTop - 8;
+        int trackH = this.height - trackTop - BOTTOM_INSET;
         if (trackH <= 0) return;
 
         drawRect(x, trackTop, x + BAR_W, trackTop + trackH, Theme.SLOT_DARK);
@@ -227,7 +231,7 @@ public abstract class ToolkitScreen extends GuiContainer {
     /** Maps a cursor position on the track to a scroll offset. */
     private void scrollToBar(int mouseY) {
         int trackTop = TAB_H + TOP_INSET;
-        int trackH = this.height - trackTop - 8;
+        int trackH = this.height - trackTop - BOTTOM_INSET;
         if (trackH <= 0) return;
         double progress = (mouseY - trackTop) / (double) trackH;
         progress = progress < 0 ? 0 : (progress > 1 ? 1 : progress);
@@ -436,6 +440,33 @@ public abstract class ToolkitScreen extends GuiContainer {
         }
 
         GL11.glEnable(GL11.GL_DEPTH_TEST);
+    }
+
+    /**
+     * Draws block face textures straight off the stitched atlas.
+     *
+     * One bind for the whole grid, then a textured quad per cell. Rendering each
+     * cell as an item instead would be thousands of model draws a frame; this is
+     * a few thousand quads against one texture, which costs nothing.
+     */
+    protected void beginBlockFaces() {
+        this.mc.getTextureManager()
+            .bindTexture(TextureMap.locationBlocksTexture);
+        GL11.glDisable(GL11.GL_LIGHTING);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    /** @param tint the block's render colour, 0xRRGGBB; 0xFFFFFF leaves the texture alone */
+    protected void drawBlockFace(IIcon icon, int tint, int x, int y, int w, int h) {
+        GL11.glColor4f(((tint >> 16) & 0xFF) / 255.0F, ((tint >> 8) & 0xFF) / 255.0F, (tint & 0xFF) / 255.0F, 1.0F);
+        drawTexturedModelRectFromIcon(x, y, icon, w, h);
+    }
+
+    protected void endBlockFaces() {
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GL11.glDisable(GL11.GL_BLEND);
     }
 
     /** Replaces the alpha channel of a packed ARGB colour. */

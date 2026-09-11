@@ -2,9 +2,12 @@ package com.builderstoolkit.client.gui;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.IIcon;
 
 import com.builderstoolkit.client.BlockColorIndex;
 import com.builderstoolkit.client.BlockColorIndex.Entry;
@@ -37,9 +40,12 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
     private static final int RESULT_GRID_Y = 208;
     private static final int BLEND_Y = 254;
     private static final int PREVIEW_Y = 372;
-    private static final int PREVIEW_H = 68;
-    private static final int PREVIEW_CELL_W = 4;
-    /** Preview columns; also the sample width used for the WorldEdit percentages. */
+    private static final int PREVIEW_H = 72;
+    /** Big enough that a block's texture is readable, small enough to show the whole wall. */
+    private static final int PREVIEW_CELL = 6;
+    private static final int PREVIEW_COLS = 38;
+    private static final int PREVIEW_ROWS = PREVIEW_H / PREVIEW_CELL;
+    /** Wall columns used for the WorldEdit percentages; the preview samples down from this. */
     private static final int BLEND_COLS = 58;
 
     // Kept across reopen within a session.
@@ -81,7 +87,7 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
             waypointAreas.add(new Rect(left + 12 + i * (SLOT + 2), top + 42, SLOT, SLOT));
         }
 
-        addFilterToggles(left + 12, top + FILTERS_Y + 14, secW() - 8, 2, 16, 2);
+        addFilterToggles(left + 12, top + FILTERS_Y + 14, secW() - 8, 3, 16, 2);
 
         int sy = top + STRIP_Y + 14;
         buttonList.add(new FlatButton(left + 12, sy, 20, 20, "-", () -> length = Math.max(2, length - 1)));
@@ -89,13 +95,14 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
         buttonList.add(new ToggleButton(left + 144, sy, 100, 20, "Dupes", () -> allowDup, () -> allowDup = !allowDup));
 
         int ay = top + ACTIONS_Y;
-        buttonList.add(new FlatButton(left + 12, ay, 80, 20, "Generate", this::generate).primary());
-        buttonList.add(new FlatButton(left + 96, ay, 60, 20, "Clear", () -> {
+        buttonList.add(new FlatButton(left + 12, ay, 60, 20, "Generate", this::generate).primary());
+        buttonList.add(new FlatButton(left + 76, ay, 64, 20, "Reshuffle", this::reshuffle));
+        buttonList.add(new FlatButton(left + 144, ay, 40, 20, "Clear", () -> {
             WAYPOINTS.clear();
             result.clear();
             blendDirty = true;
         }));
-        buttonList.add(new FlatButton(left + 160, ay, 84, 20, "Copy IDs", this::copyIds));
+        buttonList.add(new FlatButton(left + 188, ay, 56, 20, "Copy IDs", this::copyIds));
 
         buildBlendControls();
     }
@@ -210,6 +217,25 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
         blendDirty = true;
     }
 
+    /**
+     * The next-best gradient: the same fit, run again with every block of the
+     * current strip penalised, so what comes back is mostly different blocks
+     * rather than the same ones in a different order. Waypoints are pinned, so
+     * the endpoints you chose survive a reshuffle.
+     */
+    private void reshuffle() {
+        if (!BlockColorIndex.isReady()) return;
+        if (result.isEmpty()) {
+            generate();
+            return;
+        }
+        Set<Entry> avoid = new HashSet<Entry>(result);
+        List<Entry> next = GradientEngine.generate(new ArrayList<Entry>(WAYPOINTS), length, allowDup, avoid);
+        if (next.isEmpty()) return;
+        result = next;
+        blendDirty = true;
+    }
+
     private void copyIds() {
         if (result.isEmpty()) return;
         StringBuilder sb = new StringBuilder();
@@ -269,37 +295,43 @@ public class GradientScreen extends ToolkitScreen implements GhostTarget {
     }
 
     /**
-     * Draws the blend as flat colour cells rather than item icons: a 58-wide
-     * wall is thousands of cells, and each averaged block colour is already
-     * indexed, so this stays cheap enough to redraw every frame.
+     * Draws the wall using each block's real side texture, which is the face a
+     * wall actually shows. The full wall is sampled down to the preview grid, so
+     * what you see is the whole gradient at the size it reads from a distance.
      */
     private void drawBlendPreview() {
         int x0 = left + 12;
         int y0 = top + PREVIEW_Y;
-        int w = BLEND_COLS * PREVIEW_CELL_W;
+        int w = PREVIEW_COLS * PREVIEW_CELL;
+        int h = PREVIEW_ROWS * PREVIEW_CELL;
 
-        rect(x0 - 1, y0 - 1, x0 + w + 1, y0 + PREVIEW_H + 1, Theme.BORDER);
-        rect(x0, y0, x0 + w, y0 + PREVIEW_H, Theme.SLOT_DARK);
+        rect(x0 - 1, y0 - 1, x0 + w + 1, y0 + h + 1, Theme.BORDER);
+        rect(x0, y0, x0 + w, y0 + h, Theme.SLOT_DARK);
 
         if (result.isEmpty()) {
-            text("Generate a gradient first", x0 + 6, y0 + PREVIEW_H / 2 - 4, Theme.TEXT_FAINT);
+            text("Generate a gradient first", x0 + 6, y0 + h / 2 - 4, Theme.TEXT_FAINT);
             return;
         }
         if (blendDirty) rebuildBlend();
         if (blendGrid.length == 0) return;
 
-        int rows = wallHeight;
-        int cellH = Math.max(1, PREVIEW_H / rows);
-        for (int gy = 0; gy < rows; gy++) {
-            int cy = y0 + gy * PREVIEW_H / rows;
-            int cy2 = Math.min(y0 + PREVIEW_H, cy + cellH);
-            for (int gx = 0; gx < BLEND_COLS; gx++) {
+        beginBlockFaces();
+        for (int py = 0; py < PREVIEW_ROWS; py++) {
+            int gy = py * wallHeight / PREVIEW_ROWS;
+            for (int px = 0; px < PREVIEW_COLS; px++) {
+                int gx = px * BLEND_COLS / PREVIEW_COLS;
                 int idx = blendGrid[gy * BLEND_COLS + gx];
                 if (idx < 0 || idx >= result.size()) continue;
-                int cx = x0 + gx * PREVIEW_CELL_W;
-                rect(cx, cy, cx + PREVIEW_CELL_W, cy2, 0xFF000000 | result.get(idx).rgb);
+
+                Entry e = result.get(idx);
+                IIcon icon = e.sideIcon();
+                int cx = x0 + px * PREVIEW_CELL;
+                int cy = y0 + py * PREVIEW_CELL;
+                if (icon == null) rect(cx, cy, cx + PREVIEW_CELL, cy + PREVIEW_CELL, 0xFF000000 | e.rgb);
+                else drawBlockFace(icon, e.tint, cx, cy, PREVIEW_CELL, PREVIEW_CELL);
             }
         }
+        endBlockFaces();
     }
 
     /** Draws the result strip and returns the entry under the cursor, if any. */

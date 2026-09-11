@@ -62,6 +62,9 @@ public final class ShapePreset {
             s = s.replaceAll("0+$", "");
             s = s.replaceAll("\\.$", "");
         }
+        // ".75" rather than "0.75": every pass of a gradient carries these.
+        if (s.startsWith("0.")) s = s.substring(1);
+        else if (s.startsWith("-0.")) s = "-" + s.substring(2);
         return s;
     }
 
@@ -73,9 +76,11 @@ public final class ShapePreset {
     private static String torusExpr(double R, double rr, double rotDeg, String dataPrefix) {
         double th = Math.toRadians(rotDeg);
         double c = Math.cos(th), s = Math.sin(th);
-        String yr = "(y*(" + f(c) + ")-z*(" + f(s) + "))";
-        String zr = "(y*(" + f(s) + ")+z*(" + f(c) + "))";
-        return dataPrefix + "(" + f(R) + "-sqrt(x^2+" + yr + "^2))^2+" + zr + "^2 < " + f(rr) + "^2";
+        // An untilted torus is the usual case; writing y*(1)-z*(0) for it wastes
+        // characters the gradient passes cannot spare.
+        String yr = rotDeg == 0 ? "y" : "(y*" + f(c) + "-z*" + f(s) + ")";
+        String zr = rotDeg == 0 ? "z" : "(y*" + f(s) + "+z*" + f(c) + ")";
+        return dataPrefix + "(" + f(R) + "-sqrt(x^2+" + yr + "^2))^2+" + zr + "^2<" + f(rr) + "^2";
     }
 
     // The custom preset is identified by index == PRESETS.length - 1.

@@ -37,7 +37,7 @@ public class PaletteScreen extends ToolkitScreen implements GhostTarget {
     private int hoveredRole = -1;
 
     public PaletteScreen() {
-        super("Building Palette", Tab.PALETTE, 300, 262);
+        super("Building Palette", Tab.PALETTE, 300, 280);
     }
 
     private static String roleLong(int i) {

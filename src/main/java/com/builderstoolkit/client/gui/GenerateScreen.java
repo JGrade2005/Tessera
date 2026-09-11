@@ -13,6 +13,7 @@ import com.builderstoolkit.client.gui.widget.CycleButton;
 import com.builderstoolkit.client.gui.widget.FlatButton;
 import com.builderstoolkit.client.gui.widget.SliderButton;
 import com.builderstoolkit.client.gui.widget.ToggleButton;
+import com.builderstoolkit.config.ModConfig;
 
 /**
  * Generate tab: builds a WorldEdit //generate command from menus and previews
@@ -194,10 +195,34 @@ public class GenerateScreen extends ToolkitScreen {
         if (!lines.isEmpty()) CommandQueue.run(lines);
     }
 
+    /**
+     * The rotation goes in separately so the gradient axis can be read before it
+     * runs: a vertical fade should stay vertical however the shape is spun.
+     */
     private List<String> gradientScript() {
         List<String> ids = GradientScreen.gradientBlockIds();
         if (ids.isEmpty()) return new ArrayList<String>();
-        return ShapeGradient.build(currentExpr(), ids, gradientAxis, gradientDither, hollow);
+        return ShapeGradient
+            .build(displayExpr(), Rotate3D.preamble(rotX, rotY, rotZ), ids, gradientAxis, gradientDither, hollow);
+    }
+
+    /** Longest gradient pass against the chat cap, which is what silently breaks builds. */
+    private String gradientStatus() {
+        if (CommandQueue.isRunning()) {
+            return "running " + (CommandQueue.total() - CommandQueue.remaining()) + " / " + CommandQueue.total();
+        }
+        List<String> lines = gradientScript();
+        if (lines.isEmpty()) return "gradient across shape  (generate one first)";
+        int longest = ShapeGradient.longest(lines);
+        int limit = ModConfig.chatLimit();
+        return lines.size() + " passes, longest " + longest + " / " + limit + " chars";
+    }
+
+    private int gradientStatusColor() {
+        if (CommandQueue.isRunning()) return Theme.TEXT_ACCENT;
+        List<String> lines = gradientScript();
+        if (lines.isEmpty()) return Theme.TEXT_DIM;
+        return ShapeGradient.longest(lines) > ModConfig.chatLimit() ? Theme.TEXT_ERROR : Theme.TEXT_OK;
     }
 
     private void cyclePreset(int dir) {
@@ -304,16 +329,7 @@ public class GenerateScreen extends ToolkitScreen {
 
         text(preset().name, left + 28, top + 31, Theme.TEXT_ACCENT);
         text("pattern", left + 8, top + 107, Theme.TEXT_DIM);
-        text(
-            CommandQueue.isRunning()
-                ? "running " + (CommandQueue.total() - CommandQueue.remaining())
-                    + " / "
-                    + CommandQueue.total()
-                    + "  (click Run gradient to cancel)"
-                : "gradient across shape",
-            left + 8,
-            top + 192,
-            CommandQueue.isRunning() ? Theme.TEXT_ACCENT : Theme.TEXT_DIM);
+        textClipped(gradientStatus(), left + 8, top + 192, panelW - 16, gradientStatusColor());
         text(isCustom() ? "expression (editable)" : "expression", left + 8, top + 214, Theme.TEXT_DIM);
         textClipped(currentCommand(), left + 8, top + 268, panelW - 16, Theme.TEXT_OK);
 

@@ -12,9 +12,10 @@ import com.builderstoolkit.client.BlockColorIndex.Entry;
 public final class PaletteFilter {
 
     /** Display labels, in toggle order. */
-    private static final String[] LABELS = { "Opaque", "Full", "No-TE", "Sides" };
+    private static final String[] LABELS = { "Opaque", "Full", "No-TE", "Sides", "No-Ore" };
 
-    private static final boolean[] ON = new boolean[LABELS.length];
+    /** Ores are off by default: their speckle never reads as a clean gradient step. */
+    private static final boolean[] ON = { false, false, false, false, true };
 
     private PaletteFilter() {}
 
@@ -44,6 +45,7 @@ public final class PaletteFilter {
         if (ON[1] && !e.fullBlock) return false;
         if (ON[2] && e.tileEntity) return false;
         if (ON[3] && !e.sameOnAllSides) return false;
+        if (ON[4] && e.ore) return false;
         return true;
     }
 
