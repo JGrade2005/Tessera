@@ -274,7 +274,11 @@ public final class BlockColorIndex {
                 try {
                     icon = block.getIcon(2, meta);
                 } catch (Throwable t) {
-                    skip(block, meta, "getIcon threw " + t.getClass().getSimpleName());
+                    skip(
+                        block,
+                        meta,
+                        "getIcon threw " + t.getClass()
+                            .getSimpleName());
                     continue;
                 }
 
@@ -289,7 +293,11 @@ public final class BlockColorIndex {
                 try {
                     job.stack = stack.copy();
                 } catch (Throwable t) {
-                    skip(block, meta, "stack copy threw " + t.getClass().getSimpleName());
+                    skip(
+                        block,
+                        meta,
+                        "stack copy threw " + t.getClass()
+                            .getSimpleName());
                     continue;
                 }
                 try {
